@@ -16,7 +16,7 @@ class KuKu:
         'lang': 'english',
         'page': '1',
         }
-        value, key = ('jwtToken', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyX2lkIjozODA2MTE5NSwiZXhwIjoxNjcwNDM3ODAwfQ.Z5fxd0WrMcOr2b_9zTr0WGmaBp_Nu7Z7UOpDS0bPznLTRPv7JHMpUve7KwO3B9DpqVnXWkw-GFrZcLTHjvLYMg")
+        value, key = ('jwtToken', "Enter JWT here")
         if key == "Enter JWT here":
             raise ValueError("Invalid Token")
         self.session = requests.Session()
