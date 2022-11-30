@@ -91,7 +91,7 @@ class KuKu:
             return
         # TODO Redo the use of FFMPEG as it's useless. and is worse
         subprocess.Popen(['ffmpeg', '-i', episodeMetadata['hls'],
-                         '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path]).wait()
+                         '-map', 'p:2', '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path]).wait()
         tag = MP4(path)
         tag['\xa9alb'] = [storyMetadata['title']]
         tag['\xa9ART'] = [storyMetadata['author']]
