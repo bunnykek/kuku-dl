@@ -152,7 +152,7 @@ class KuKu:
                 epMeta['hls'] = ep['content']['hls_url'].strip()
                 epMeta['epNo'] = ep['index']
                 epMeta['seasonNo'] = ep['season_no']
-                epMeta['date'] = ep['published_on'].strip()
+                epMeta['date'] = str(ep.get('published_on')).strip()
                 trackPath = os.path.join(albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
                 try:
                     self.downloadAndTag(epMeta, albMetadata, trackPath,
