@@ -1,87 +1,60 @@
-import requests
-import subprocess
+import argparse
+import json
 import os
 import re
-from urllib.parse import urlparse
+import requests
+import subprocess
+from bs4 import BeautifulSoup
 from mutagen.mp4 import MP4, MP4Cover
+from urllib.parse import urlparse
+
 
 class KuKu:
-    def __init__(self) -> None:
+    def __init__(self, url: str) -> None:
         """
         __init__()
 
         initializes a session to be used to recieve API data from KukuFM.
         """
-        self.params = {
-        'lang': 'english',
-        'page': '1',
-        }
-        value, key = ('jwtToken', "Enter JWT here")
-        if key == "Enter JWT here":
-            raise ValueError("Invalid Token")
+        self.showID = urlparse(url).path.split('/')[-1]
         self.session = requests.Session()
-        self.session.cookies.set(value, key)
-        
-    def get(self, storyID: str, page=1) -> dict:
-        """
-        get()
 
-        Method to send a requests over to KukuFM servers in order to recieve metadata, and HLS stream.
+        response = self.session.get(url)
+        parser = BeautifulSoup(response.content, features='html.parser')
+        data = parser.select_one('#__NEXT_DATA__').contents[0]
+        data = json.loads(data)
 
-        @param storyID: Str value of the story ID used to identifiy books over to KukuFM API
-        @param page: Str value to index which page used for KukuFM API.
-        """
-        self.params['page'] = page
-        response = self.session.get(
-                url = (f'https://kukufm.com/api/v2.1/channels/%s/episodes/' % storyID),
-                params = self.params
-            )
-        if not response:
-            raise ValueError("Unable to get response")
-        
-        return response.json()
+        self.episodeUrl = f"{data['assetPrefix']}/_next/data/{data['buildId']}/episode"
 
-    def getMetadata(self, storyID: str) -> dict:
-        """
-        getMetadata()
+        show = data['props']['pageProps']['dehydratedState']['queries'][0]['state']['data']['pages'][0]['show']
+        self.metadata = {
+            'title': show['title'].strip(),
+            'image': show['originalImage'],
+            'date': show['publishedOn'],
+            'fictional': show['isFictional'],
+            'nEpisodes': show['nEpisodes'],
+            'author': show['author']['name'].strip(),
+            'lang': show['language'].capitalize().strip(),
+            'type': show['contentType']['title'].strip(),
+            'ageRating': show['metaData']['ageRating'].strip(),
+            'credits': {},
+        }
 
-        Method to parse metadata from KukuFM API into a dict format.
+        for credit in show['credits'].keys():
+            self.metadata['credits'][credit] = ', '.join(
+                [person['fullName'] for person in show['credits'][credit]])
 
-        @param storyID: Str value of the story ID used to identifiy books over to KukuFM API
-        """
-        meta = self.get(storyID).get("show")
-        metadata = {}
-        metadata['title'] = meta['title'].strip()
-        metadata['image'] = meta['original_image'].strip()
-        metadata['date'] = meta['published_on'].strip()
-        metadata['fictional'] = str(meta['is_fictional'])
-        metadata['nEpisodes'] = meta['n_episodes']
-        metadata['author'] = meta['author']['name'].strip()
-        metadata['lang'] = meta['language'].capitalize().strip()
-        metadata['type'] = meta['content_type']['title'].strip()
-        metadata['ageRating'] = meta['meta_data']['age_rating'].strip()
-
-        metadata['credits'] = {}
-        # TODO Redo the way this is handled properly in order to save a list of names properly to the metadata.
-        for credit in meta['credits'].keys():
-            tempList = []
-            for person in meta['credits'][credit]:
-                tempList.append(person['full_name'])
-            metadata['credits'][credit] = ', '.join(tempList)
-
-        return metadata
-
-    def sanitiseName(self, name) -> str:
+    @staticmethod
+    def sanitiseName(name) -> str:
         return re.sub(r'[:]', ' - ', re.sub(r'[\\/*?"<>|$]', '', re.sub(r'[ \t]+$', '', str(name).rstrip())))
 
-    def downloadAndTag(self, episodeMetadata: dict, storyMetadata: dict, path: str, coverPath: str) -> None:
+    def downloadAndTag(self, episodeMetadata: dict, path: str, coverPath: str) -> None:
         """
         downloadAndTag()
 
         Method to download and tag locally using the KukuFM API and FFMPEG
 
         @param episodeMetadata: dict object that includes the track metadata.
-        @param storyMetadata: dict object that includes the story metadata.
         @param path: str which sets a path to be downloaded to.
         @param coverPath: str path which locates where cover art is, so it'll be embeded within the file.
         """
@@ -90,83 +63,98 @@ class KuKu:
             print(episodeMetadata['title'], 'already exists!', flush=True)
             return
         # TODO Redo the use of FFMPEG as it's useless. and is worse
-        subprocess.Popen(['ffmpeg', '-i', episodeMetadata['hls'],
-                         '-map', 'p:2', '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path]).wait()
+        subprocess.run(['ffmpeg', '-i', episodeMetadata['hls'],
+                        '-map', 'p:2', '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path])
         tag = MP4(path)
-        tag['\xa9alb'] = [storyMetadata['title']]
-        tag['\xa9ART'] = [storyMetadata['author']]
-        tag['aART'] = [storyMetadata['author']]
+        tag['\xa9alb'] = [self.metadata['title']]
+        tag['\xa9ART'] = [self.metadata['author']]
+        tag['aART'] = [self.metadata['author']]
         tag['\xa9day'] = [episodeMetadata['date'][0:10]]
-        tag['trkn'] = [(int(episodeMetadata['epNo']), int(storyMetadata['nEpisodes']))]
+        tag['trkn'] = [(int(episodeMetadata['epNo']),
+                        int(self.metadata['nEpisodes']))]
         tag['stik'] = [2]
         tag['\xa9nam'] = [episodeMetadata['title']]
         tag.pop("©too")
 
         tag['----:com.apple.iTunes:Fictional'] = bytes(
-            str(storyMetadata["fictional"]), 'UTF-8')
-        tag['----:com.apple.iTunes:Author'] = bytes(str(storyMetadata["author"]), 'UTF-8')
-        tag['----:com.apple.iTunes:Language'] = bytes(str(storyMetadata["lang"]), 'UTF-8')
-        tag['----:com.apple.iTunes:Type'] = bytes(str(storyMetadata["type"]), 'UTF-8')
-        tag['----:com.apple.iTunes:Season'] = bytes(str(episodeMetadata["seasonNo"]), 'UTF-8')
+            str(self.metadata["fictional"]), 'UTF-8')
+        tag['----:com.apple.iTunes:Author'] = bytes(
+            str(self.metadata["author"]), 'UTF-8')
+        tag['----:com.apple.iTunes:Language'] = bytes(
+            str(self.metadata["lang"]), 'UTF-8')
+        tag['----:com.apple.iTunes:Type'] = bytes(
+            str(self.metadata["type"]), 'UTF-8')
+        tag['----:com.apple.iTunes:Season'] = bytes(
+            str(episodeMetadata["seasonNo"]), 'UTF-8')
         tag['----:com.apple.iTunes:Age rating'] = bytes(
-            str(storyMetadata["ageRating"]), 'UTF-8')
+            str(self.metadata["ageRating"]), 'UTF-8')
 
-        for cat in storyMetadata['credits'].keys():
+        for cat in self.metadata['credits'].keys():
             credit = cat.replace('_', ' ').capitalize()
             tag[f'----:com.apple.iTunes:{credit}'] = bytes(
-                str(storyMetadata['credits'][cat]), 'UTF-8')
+                str(self.metadata['credits'][cat]), 'UTF-8')
         with open(coverPath, 'rb') as f:
             pic = MP4Cover(f.read())
             tag['covr'] = [pic]
         tag.save()
 
-
-    def downAlbum(self, storyID) -> None:
+    def downAlbum(self) -> None:
         """
         downAlbum()
 
         Method where it'll prepare a storyID to be stored onto locally.
-
-        @param storyID: Str value of the story ID used to identifiy books over to KukuFM API
         """
-        albMetadata = self.getMetadata(storyID)
-        folderName = f"{albMetadata['title']} "
-        folderName +=  f"({albMetadata['date'][:4]}) " if albMetadata.get('date') else ''
-        folderName +=  f"[{albMetadata['lang']}]"
-        
+        folderName = f"{self.metadata['title']} "
+        folderName += f"({self.metadata['date'][:4]}) " if self.metadata.get(
+            'date') else ''
+        folderName += f"[{self.metadata['lang']}]"
+
         albumPath = os.path.join(
-            os.getcwd(), 'Downloads', albMetadata['lang'], albMetadata['type'], self.sanitiseName(folderName))
+            os.getcwd(), 'Downloads', self.metadata['lang'], self.metadata['type'], self.sanitiseName(folderName))
 
         if not os.path.exists(albumPath):
             os.makedirs(albumPath)
 
         with open(os.path.join(albumPath, 'cover.png'), 'wb') as f:
-            f.write(self.session.get(albMetadata['image']).content)
+            f.write(self.session.get(self.metadata['image']).content)
 
-        for i in range(1, 20000):
-            response = self.get(storyID = storyID, page = i)
-            for ep in response['episodes']:
-                print(ep['title'].strip())
-                epMeta = {}
-                epMeta['title'] = re.sub(r"\d+.", "", ep['title']).strip()
-                epMeta['hls'] = ep['content']['hls_url'].strip()
-                epMeta['epNo'] = ep['index']
-                epMeta['seasonNo'] = ep['season_no']
-                epMeta['date'] = str(ep.get('published_on')).strip()
-                trackPath = os.path.join(albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
-                try:
-                    self.downloadAndTag(epMeta, albMetadata, trackPath,
-                                   os.path.join(albumPath, 'cover.png'))
+        episodes = []
+        page = 1
 
-                except Exception as e:
-                    print(ep['title'], e, flush=True)
-            if not response.get('has_more'):
+        while True:
+            response = self.session.get(
+                f'https://kukufm.com/api/v2.1/channels/{self.showID}/episodes/?page={page}')
+            data = response.json()
+            episodes.extend(data["episodes"])
+            page += 1
+
+            if not data["has_more"]:
                 break
 
-if __name__ == '__main__':
-    kukuSession = KuKu()
-    url = input("Enter kukufm URL: ")
-    kukuURL = urlparse(url)
-    kukuID = kukuURL.path.split('/')[-1]
+        for ep in episodes:
+            response = self.session.get(f"{self.episodeUrl}/{ep['slug']}.json")
+            data = response.json()
+            ep = data['pageProps']['episode']
 
-    kukuSession.downAlbum(kukuID)
+            epMeta = {
+                'title': re.sub(r"\d+.", "", ep['title']).strip(),
+                'hls': ep['content']['hlsUrl'].strip(),
+                'epNo': ep['index'],
+                'seasonNo': ep['seasonNo'],
+                'date': str(ep.get('publishedOn')).strip(),
+            }
+
+            trackPath = os.path.join(
+                albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
+            self.downloadAndTag(epMeta, trackPath,
+                                os.path.join(albumPath, 'cover.png'))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='kuku-dl',
+        description='KuKu FM Downloader!',
+    )
+    parser.add_argument('url', help="Show Url")
+    args = parser.parse_args()
+    KuKu(args.url).downAlbum()
