@@ -6,17 +6,13 @@ Kuku FM downloader!
 - Tags the tracks/eps with all the necessary metadata and cover artwork.
 
 ### Setup
-- Login to kukufm.com in the browser and get the `jwtToken` value from the browser cookie. 
-- Put the `jwtToken` value in line #18 of `kuku.py` file.
 - Install FFMPEG
 - `pip install requirements.txt`
-
-<img src="https://i.imgur.com/HgmUmMp.jpeg" width="300">    
 
 ### Usage     
       
 ```
-python3 kuku.py
+py kuku.py [url]
 ```
 
 ### Sample MediaInfo
