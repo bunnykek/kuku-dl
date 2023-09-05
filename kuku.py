@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 
 class KuKu:
-    def __init__(self, url: str, token: str) -> None:
+    def __init__(self, url: str) -> None:
         """
         __init__()
 
@@ -18,9 +18,6 @@ class KuKu:
         """
         self.showID = urlparse(url).path.split('/')[-1]
         self.session = requests.Session()
-
-        if token:
-            self.session.cookies.set("jwtToken", token)
 
         response = self.session.get(url)
         parser = BeautifulSoup(response.content, features='html.parser')
@@ -106,8 +103,6 @@ class KuKu:
         downAlbum()
 
         Method where it'll prepare a storyID to be stored onto locally.
-
-        @param storyID: Str value of the story ID used to identifiy books over to KukuFM API
         """
         folderName = f"{self.metadata['title']} "
         folderName += f"({self.metadata['date'][:4]}) " if self.metadata.get(
@@ -161,6 +156,5 @@ if __name__ == '__main__':
         description='KuKu FM Downloader!',
     )
     parser.add_argument('url', help="Show Url")
-    parser.add_argument('--token', help="jwtToken Value")
     args = parser.parse_args()
-    KuKu(args.url, args.token).downAlbum()
+    KuKu(args.url).downAlbum()
