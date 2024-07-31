@@ -4,10 +4,10 @@ import os
 import re
 import requests
 import subprocess
-from bs4 import BeautifulSoup
 from mutagen.mp4 import MP4, MP4Cover
 from urllib.parse import urlparse
 
+TITLE = "\r\n /$$   /$$           /$$                               /$$ /$$\r\n| $$  /$$/          | $$                              | $$| $$\r\n| $$ /$$/  /$$   /$$| $$   /$$ /$$   /$$          /$$$$$$$| $$\r\n| $$$$$/  | $$  | $$| $$  /$$/| $$  | $$ /$$$$$$ /$$__  $$| $$\r\n| $$  $$  | $$  | $$| $$$$$$/ | $$  | $$|______/| $$  | $$| $$\r\n| $$\\  $$ | $$  | $$| $$_  $$ | $$  | $$        | $$  | $$| $$\r\n| $$ \\  $$|  $$$$$$/| $$ \\  $$|  $$$$$$/        |  $$$$$$$| $$\r\n|__/  \\__/ \\______/ |__/  \\__/ \\______/          \\_______/|__/\r\n                      --by @bunnykek"
 
 class KuKu:
     def __init__(self, url: str) -> None:
@@ -19,30 +19,36 @@ class KuKu:
         self.showID = urlparse(url).path.split('/')[-1]
         self.session = requests.Session()
 
-        response = self.session.get(url)
-        parser = BeautifulSoup(response.content, features='html.parser')
-        data = parser.select_one('#__NEXT_DATA__').contents[0]
-        data = json.loads(data)
+        response = self.session.get(f"https://kukufm.com/api/v2.3/channels/{self.showID}/episodes/")
+        data = response.json()
 
-        self.episodeUrl = f"{data['assetPrefix']}/_next/data/{data['buildId']}/episode"
-
-        show = data['props']['pageProps']['dehydratedState']['queries'][0]['state']['data']['pages'][0]['show']
+        show = data['show']
         self.metadata = {
             'title': show['title'].strip(),
-            'image': show['originalImage'],
-            'date': show['publishedOn'],
-            'fictional': show['isFictional'],
-            'nEpisodes': show['nEpisodes'],
+            'image': show['original_image'],
+            'date': show['published_on'],
+            'fictional': show['is_fictional'],
+            'nEpisodes': show['n_episodes'],
             'author': show['author']['name'].strip(),
             'lang': show['language'].capitalize().strip(),
-            'type': show['contentType']['title'].strip(),
-            'ageRating': show['metaData']['ageRating'].strip(),
+            'type': show['content_type']['title'].strip(),
+            'ageRating': show['meta_data']['age_rating'].strip(),
             'credits': {},
         }
 
+        album_info = F"""Album info:
+                Name: {self.metadata['title']}
+                Author: {self.metadata['author']}
+                Language: {self.metadata['lang']}
+                Date: {self.metadata['date']}
+                Age rating: {self.metadata['ageRating']}
+                Episodes: {self.metadata['nEpisodes']}
+        """
+        print(album_info)
+        
         for credit in show['credits'].keys():
             self.metadata['credits'][credit] = ', '.join(
-                [person['fullName'] for person in show['credits'][credit]])
+                [person['full_name'] for person in show['credits'][credit]])
 
     @staticmethod
     def sanitiseName(name) -> str:
@@ -64,7 +70,7 @@ class KuKu:
             return
         # TODO Redo the use of FFMPEG as it's useless. and is worse
         subprocess.run(['ffmpeg', '-i', episodeMetadata['hls'],
-                        '-map', 'p:2', '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path])
+                        '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path])
         tag = MP4(path)
         tag['\xa9alb'] = [self.metadata['title']]
         tag['\xa9ART'] = [self.metadata['author']]
@@ -123,7 +129,7 @@ class KuKu:
 
         while True:
             response = self.session.get(
-                f'https://kukufm.com/api/v2.1/channels/{self.showID}/episodes/?page={page}')
+                f'https://kukufm.com/api/v2.0/channels/{self.showID}/episodes/?page={page}')
             data = response.json()
             episodes.extend(data["episodes"])
             page += 1
@@ -132,18 +138,14 @@ class KuKu:
                 break
 
         for ep in episodes:
-            response = self.session.get(f"{self.episodeUrl}/{ep['slug']}.json")
-            data = response.json()
-            ep = data['pageProps']['episode']
-
             epMeta = {
-                'title': re.sub(r"\d+.", "", ep['title']).strip(),
-                'hls': ep['content']['hlsUrl'].strip(),
+                'title': ep["title"].strip(),
+                'hls': ep['content']['hls_url'].strip(),
                 'epNo': ep['index'],
-                'seasonNo': ep['seasonNo'],
-                'date': str(ep.get('publishedOn')).strip(),
+                'seasonNo': ep['season_no'],
+                'date': str(ep.get('published_on')).strip(),
             }
-
+                        
             trackPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
             self.downloadAndTag(epMeta, trackPath,
@@ -151,6 +153,7 @@ class KuKu:
 
 
 if __name__ == '__main__':
+    print(TITLE)
     parser = argparse.ArgumentParser(
         prog='kuku-dl',
         description='KuKu FM Downloader!',
