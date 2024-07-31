@@ -19,19 +19,19 @@ class KuKu:
         self.showID = urlparse(url).path.split('/')[-1]
         self.session = requests.Session()
 
-        response = self.session.get(f"https://kukufm.com/api/v2.3/channels/{self.showID}/episodes/")
+        response = self.session.get(f"https://kukufm.com/api/v2.3/channels/{self.showID}/episodes/?page=1")
         data = response.json()
 
         show = data['show']
         self.metadata = {
-            'title': show['title'].strip(),
+            'title': KuKu.sanitiseName(show['title'].strip()),
             'image': show['original_image'],
             'date': show['published_on'],
             'fictional': show['is_fictional'],
             'nEpisodes': show['n_episodes'],
             'author': show['author']['name'].strip(),
             'lang': show['language'].capitalize().strip(),
-            'type': show['content_type']['title'].strip(),
+            'type': ' '.join(show['content_type']['slug'].strip().split('-')).capitalize(),
             'ageRating': show['meta_data']['age_rating'].strip(),
             'credits': {},
         }
@@ -53,8 +53,35 @@ class KuKu:
     @staticmethod
     def sanitiseName(name) -> str:
         return re.sub(r'[:]', ' - ', re.sub(r'[\\/*?"<>|$]', '', re.sub(r'[ \t]+$', '', str(name).rstrip())))
+    
+    # ChatGPT code
+    @staticmethod
+    def srt_to_custom_format(srt_content) -> str:
+        subtitles = re.split(r'\n\n', srt_content)
+        formatted_output = ""
+        timestamp_pattern = re.compile(r'(\d{2}):(\d{2}):(\d{2}),(\d{2})\d')
 
-    def downloadAndTag(self, episodeMetadata: dict, path: str, coverPath: str) -> None:
+        for subtitle in subtitles:
+            if subtitle.strip():  # Make sure the subtitle block is not empty
+                parts = subtitle.split('\n')
+                if len(parts) >= 3:
+                    # Extract start and end timestamps
+                    timestamps = parts[1].split(' --> ')
+                    start_timestamp = timestamps[0]
+                    
+                    # Convert timestamp to the desired format [MM:SS.SS]
+                    start_timestamp = timestamp_pattern.sub(r'\2:\3.\4', start_timestamp)
+                    
+                    # Extract subtitle text and join multiple lines with a space
+                    subtitle_text = ' '.join(parts[2:])
+                    
+                    # Append to the formatted output
+                    formatted_output += f"[{start_timestamp}] {subtitle_text} "
+
+        return formatted_output
+
+
+    def downloadAndTag(self, episodeMetadata: dict, path: str, srtPath: str, coverPath: str) -> None:
         """
         downloadAndTag()
 
@@ -62,6 +89,7 @@ class KuKu:
 
         @param episodeMetadata: dict object that includes the track metadata.
         @param path: str which sets a path to be downloaded to.
+        @param srtPath: str which sets the subtitle file path.
         @param coverPath: str path which locates where cover art is, so it'll be embeded within the file.
         """
         print('Downloading', episodeMetadata['title'], flush=True)
@@ -71,7 +99,18 @@ class KuKu:
         # TODO Redo the use of FFMPEG as it's useless. and is worse
         subprocess.run(['ffmpeg', '-i', episodeMetadata['hls'],
                         '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path])
+        
+        hasLyrics: bool = len(episodeMetadata['srt'])
+        
+        if hasLyrics:
+            srt_response = self.session.get(episodeMetadata['srt'])
+            with open(srtPath, 'w', encoding='utf-8') as f:
+                f.write(srt_response.text)
+        
         tag = MP4(path)
+        
+        # if hasLyrics:
+        #     tag['\xa9lyr'] = [KuKu.srt_to_custom_format(srt_response.text)]
         tag['\xa9alb'] = [self.metadata['title']]
         tag['\xa9ART'] = [self.metadata['author']]
         tag['aART'] = [self.metadata['author']]
@@ -133,14 +172,15 @@ class KuKu:
             data = response.json()
             episodes.extend(data["episodes"])
             page += 1
-
+            
             if not data["has_more"]:
                 break
 
         for ep in episodes:
             epMeta = {
-                'title': ep["title"].strip(),
+                'title': KuKu.sanitiseName(ep["title"].strip()),
                 'hls': ep['content']['hls_url'].strip(),
+                'srt': ep['content']['subtitle_url'].strip(),
                 'epNo': ep['index'],
                 'seasonNo': ep['season_no'],
                 'date': str(ep.get('published_on')).strip(),
@@ -148,7 +188,9 @@ class KuKu:
                         
             trackPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
-            self.downloadAndTag(epMeta, trackPath,
+            srtPath = os.path.join(
+                albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.srt")
+            self.downloadAndTag(epMeta, trackPath, srtPath,
                                 os.path.join(albumPath, 'cover.png'))
 
 
