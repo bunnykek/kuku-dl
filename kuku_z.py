@@ -191,10 +191,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='kuku-dl', description='KuKu FM Downloader!',)
 
     parser.add_argument('url', type=str, help='The URL of the video to download')
-    parser.add_argument('--formats', type=lambda f: Formats[f.upper()], choices=list(Formats), default=Formats.LOWEST,
-                        help='The format to download the audio in (default: lowest)')
+    parser.add_argument('--formats', choices=[Formats.HIGHEST, Formats.MEDIUM, Formats.LOWEST], default=Formats.LOWEST, help='The format to download the audio in (default: 128)')
     parser.add_argument('--path', type=str, default='downloads', help='The path to save the Album (default: downloads)')
-    parser.add_argument('--rip_subtitles', action='store_true', default=False, help='Whether to rip subtitles (default: False)')
+    parser.add_argument('--rip-subtitles', action='store_true', default=False, help='Whether to rip subtitles (default: False)')
     parser.add_argument('--workers', type=int, default=5, help='Number of worker threads to use (default: 5)')
 
     args = parser.parse_args()
