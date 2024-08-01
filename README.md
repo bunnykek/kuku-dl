@@ -4,6 +4,7 @@ Kuku FM downloader!
 ### Features
 - Downloads podcasts/story/etc.
 - Tags the tracks/eps with all the necessary metadata and cover artwork.
+- Subtitles
 
 ### Setup
 - Install FFMPEG
