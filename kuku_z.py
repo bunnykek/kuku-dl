@@ -13,8 +13,8 @@ class Formats:
     LOWEST = "128"
 
 class KuKu:
-    def __init__(self, url: str, formats=Formats.LOWEST, path: str="downloads",rip_subtitles: bool=False, workers: int=5):
-        self.workers = workers
+    def __init__(self, url: str, formats=Formats.LOWEST, path: str="downloads",rip_subtitles: bool=False, batch_size: int=5):
+        self.batch_size = batch_size
         self._path = path
         self.rip_subs = rip_subtitles
         self.showID = urlparse(url).path.split('/')[-1]
@@ -182,7 +182,7 @@ class KuKu:
         return self.albumPath
 
     async def divide_and_run(self, tasks: list) -> None:
-        tasks = self.divide_list(tasks, self.workers)
+        tasks = self.divide_list(tasks, self.batch_size)
         for task_batch in tasks:
             asyncio.gather(*task_batch)
             await asyncio.sleep(10)
@@ -194,10 +194,10 @@ if __name__ == "__main__":
     parser.add_argument('--formats', choices=[Formats.HIGHEST, Formats.MEDIUM, Formats.LOWEST], default=Formats.LOWEST, help='The format to download the audio in (default: 128)')
     parser.add_argument('--path', type=str, default='downloads', help='The path to save the Album (default: downloads)')
     parser.add_argument('--rip-subtitles', action='store_true', default=False, help='Whether to rip subtitles (default: False)')
-    parser.add_argument('--workers', type=int, default=5, help='Number of worker threads to use (default: 5)')
+    parser.add_argument('--batch-size', type=int, default=5, help='Number of Task In A Single Batch (default: 5)')
 
     args = parser.parse_args()
-    KUKU = KuKu(args.url, args.formats, args.path, args.rip_subtitles, args.workers)
+    KUKU = KuKu(args.url, args.formats, args.path, args.rip_subtitles, args.batch_size)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(KUKU.downloadAlbum())
