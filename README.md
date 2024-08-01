@@ -13,7 +13,7 @@ Kuku FM downloader!
 ### Usage     
       
 ```
-py kuku.py [url]
+python -m kuku [url]
 ```
 
 ### Sample MediaInfo
