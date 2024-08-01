@@ -54,31 +54,31 @@ class KuKu:
     def sanitiseName(name) -> str:
         return re.sub(r'[:]', ' - ', re.sub(r'[\\/*?"<>|$]', '', re.sub(r'[ \t]+$', '', str(name).rstrip())))
     
-    # ChatGPT code
-    @staticmethod
-    def srt_to_custom_format(srt_content) -> str:
-        subtitles = re.split(r'\n\n', srt_content)
-        formatted_output = ""
-        timestamp_pattern = re.compile(r'(\d{2}):(\d{2}):(\d{2}),(\d{2})\d')
+    # # ChatGPT code
+    # @staticmethod
+    # def srt_to_custom_format(srt_content) -> str:
+    #     subtitles = re.split(r'\n\n', srt_content)
+    #     formatted_output = ""
+    #     timestamp_pattern = re.compile(r'(\d{2}):(\d{2}):(\d{2}),(\d{2})\d')
 
-        for subtitle in subtitles:
-            if subtitle.strip():  # Make sure the subtitle block is not empty
-                parts = subtitle.split('\n')
-                if len(parts) >= 3:
-                    # Extract start and end timestamps
-                    timestamps = parts[1].split(' --> ')
-                    start_timestamp = timestamps[0]
+    #     for subtitle in subtitles:
+    #         if subtitle.strip():  # Make sure the subtitle block is not empty
+    #             parts = subtitle.split('\n')
+    #             if len(parts) >= 3:
+    #                 # Extract start and end timestamps
+    #                 timestamps = parts[1].split(' --> ')
+    #                 start_timestamp = timestamps[0]
                     
-                    # Convert timestamp to the desired format [MM:SS.SS]
-                    start_timestamp = timestamp_pattern.sub(r'\2:\3.\4', start_timestamp)
+    #                 # Convert timestamp to the desired format [MM:SS.SS]
+    #                 start_timestamp = timestamp_pattern.sub(r'\2:\3.\4', start_timestamp)
                     
-                    # Extract subtitle text and join multiple lines with a space
-                    subtitle_text = ' '.join(parts[2:])
+    #                 # Extract subtitle text and join multiple lines with a space
+    #                 subtitle_text = ' '.join(parts[2:])
                     
-                    # Append to the formatted output
-                    formatted_output += f"[{start_timestamp}] {subtitle_text} "
+    #                 # Append to the formatted output
+    #                 formatted_output += f"[{start_timestamp}] {subtitle_text} "
 
-        return formatted_output
+    #     return formatted_output
 
 
     def downloadAndTag(self, episodeMetadata: dict, path: str, srtPath: str, coverPath: str) -> None:
@@ -179,12 +179,14 @@ class KuKu:
         for ep in episodes:
             epMeta = {
                 'title': KuKu.sanitiseName(ep["title"].strip()),
-                'hls': ep['content']['hls_url'].strip(),
-                'srt': ep['content']['subtitle_url'].strip(),
+                'hls': ep['content']['hls_url'].strip()[:-5]+"128kb.m3u8",
+                'srt': ep['content'].get('subtitle_url', "").strip(),
                 'epNo': ep['index'],
                 'seasonNo': ep['season_no'],
                 'date': str(ep.get('published_on')).strip(),
             }
+            print(ep['content']['hls_url'])
+            print(epMeta['hls'])
                         
             trackPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
