@@ -18,18 +18,12 @@
 
 import argparse
 
-from .dl import Formats, KuKu, asyncio
+from .dl import KuKu, asyncio
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="kuku-dl", description="KuKu FM Downloader!")
 
     parser.add_argument("url", type=str, help="The URL of the video to download")
-    parser.add_argument(
-        "--format",
-        choices=[Formats.HIGHEST, Formats.MEDIUM, Formats.LOWEST],
-        default=Formats.LOWEST,
-        help="The format to download the audio in (default: 128)",
-    )
     parser.add_argument(
         "--path",
         type=str,
@@ -50,7 +44,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    KUKU = KuKu(args.url, args.format, args.path, args.rip_subtitles, args.batch_size)
+    KUKU = KuKu(args.url, args.path, args.rip_subtitles, args.batch_size)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(KUKU.downloadAlbum())

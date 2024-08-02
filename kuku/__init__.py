@@ -16,4 +16,4 @@
 # if you are using this following code then don't forgot to give proper
 # credit to (github.com/bunnykek)
 
-from .dl import Formats, KuKu
+from .dl import KuKu

@@ -35,17 +35,10 @@ from yt_dlp import YoutubeDL
 # Option And GPLv3 in Repo
 
 
-class Formats:
-    HIGHEST = "320"
-    MEDIUM = "256"
-    LOWEST = "128"
-
-
 class KuKu:
     def __init__(
         self,
         url: str,
-        formats=Formats.LOWEST,
         path: str = "downloads",
         rip_subtitles: bool = False,
         batch_size: int = 5,
@@ -80,14 +73,6 @@ class KuKu:
             "prefer_ffmpeg": True,
             "geo_bypass": True,
             "logtostderr": False,
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "m4a",
-                    "preferredquality": formats,
-                },
-                {"key": "FFmpegMetadata"},
-            ],
         }
         self.create_dirs()
 
@@ -168,7 +153,7 @@ class KuKu:
             async with aiofiles.open(srtPath, "w", encoding="utf-8") as f:
                 await f.write(srt_response)
 
-        tag = MP4(path + ".m4a")
+        tag = MP4(path)
 
         tag["\xa9alb"] = [self.metadata["title"]]
         tag["\xa9ART"] = [self.metadata["author"]]
@@ -231,7 +216,7 @@ class KuKu:
                 "seasonNo": ep["season_no"],
                 "date": str(ep.get("published_on")).strip(),
             }
-            trackPath = os.path.join(self.albumPath, f"{epMeta['title']}")
+            trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
             srtPath = (
                 os.path.join(self.albumPath, f"{epMeta['title']}.srt")
                 if self.rip_subs
