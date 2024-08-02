@@ -1,2 +1,4 @@
 requests
-mutagen
+aiohttp==3.8.5
+aiofiles==0.8.0
+yt_dlp==2024.4.9
