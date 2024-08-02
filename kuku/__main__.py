@@ -43,8 +43,15 @@ if __name__ == "__main__":
         help="Number of Task In A Single Batch (default: 5)",
     )
 
+    parser.add_argument(
+        "--archive",
+        action="store_true",
+        default=False,
+        help="Whether to create archive (zip) (default: False)",
+    )
+
     args = parser.parse_args()
-    KUKU = KuKu(args.url, args.path, args.rip_subtitles, args.batch_size)
+    KUKU = KuKu(args.url, args.path, args.rip_subtitles, args.batch_size, args.archive)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(KUKU.downloadAlbum())

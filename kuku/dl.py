@@ -20,6 +20,7 @@ import asyncio
 import multiprocessing
 import os
 import re
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial, wraps
 from traceback import format_exc
@@ -31,8 +32,9 @@ import requests
 from mutagen.mp4 import MP4, MP4Cover
 from yt_dlp import YoutubeDL
 
-# TODO: Replace Print With Logging And Adding Zip Option And Combine
-# Option And GPLv3 in Repo
+from .errors import UnableToArchive
+
+# TODO: Option to Combine The Audios Into One Audio File
 
 
 class KuKu:
@@ -42,10 +44,12 @@ class KuKu:
         path: str = "downloads",
         rip_subtitles: bool = False,
         batch_size: int = 5,
+        archive: bool = False,
     ):
         self.batch_size = batch_size
         self._path = path
         self.rip_subs = rip_subtitles
+        self.archive = archive
         self.showID = urlparse(url).path.split("/")[-1]
         self.session = aiohttp.ClientSession()
         data = requests.get(
@@ -124,6 +128,14 @@ class KuKu:
             re.sub(r'[\\/*?"<>|$]', "", re.sub(r"[ \t]+$", "", str(name).rstrip())),
         )
 
+    def create_zip(self):
+        shutil.make_archive(self.albumPath, "zip", self.albumPath)
+        zip_path = self.albumPath + ".zip"
+        if os.path.exists(zip_path):
+            shutil.rmtree(self.albumPath)
+            return zip_path
+        raise UnableToArchive("Unable To Archive The Album!")
+
     def create_dirs(self) -> None:
         folderName = f"{self.metadata['title']} "
         folderName += (
@@ -141,7 +153,6 @@ class KuKu:
 
     async def download(self, episodeMetadata: dict, path: str, srtPath: str) -> None:
         if os.path.exists(path):
-            print(episodeMetadata["title"], "Already Exists!", flush=True)
             return
         opts = dict(self.opts)
         opts["outtmpl"] = path
@@ -226,6 +237,8 @@ class KuKu:
 
         await self.divide_and_run(tasks)
         await self.session.close()
+        if self.archive:
+            return self.create_zip()
         return self.albumPath
 
     async def divide_and_run(self, tasks: list) -> None:
