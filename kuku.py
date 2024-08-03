@@ -23,6 +23,7 @@ class KuKu:
         data = response.json()
 
         show = data['show']
+        # print(show)
         self.metadata = {
             'title': KuKu.sanitiseName(show['title'].strip()),
             'image': show['original_image'],
@@ -32,7 +33,7 @@ class KuKu:
             'author': show['author']['name'].strip(),
             'lang': show['language'].capitalize().strip(),
             'type': ' '.join(show['content_type']['slug'].strip().split('-')).capitalize(),
-            'ageRating': show['meta_data']['age_rating'].strip(),
+            'ageRating': show['meta_data'].get('age_rating', None),
             'credits': {},
         }
 
@@ -53,32 +54,6 @@ class KuKu:
     @staticmethod
     def sanitiseName(name) -> str:
         return re.sub(r'[:]', ' - ', re.sub(r'[\\/*?"<>|$]', '', re.sub(r'[ \t]+$', '', str(name).rstrip())))
-    
-    # # ChatGPT code
-    # @staticmethod
-    # def srt_to_custom_format(srt_content) -> str:
-    #     subtitles = re.split(r'\n\n', srt_content)
-    #     formatted_output = ""
-    #     timestamp_pattern = re.compile(r'(\d{2}):(\d{2}):(\d{2}),(\d{2})\d')
-
-    #     for subtitle in subtitles:
-    #         if subtitle.strip():  # Make sure the subtitle block is not empty
-    #             parts = subtitle.split('\n')
-    #             if len(parts) >= 3:
-    #                 # Extract start and end timestamps
-    #                 timestamps = parts[1].split(' --> ')
-    #                 start_timestamp = timestamps[0]
-                    
-    #                 # Convert timestamp to the desired format [MM:SS.SS]
-    #                 start_timestamp = timestamp_pattern.sub(r'\2:\3.\4', start_timestamp)
-                    
-    #                 # Extract subtitle text and join multiple lines with a space
-    #                 subtitle_text = ' '.join(parts[2:])
-                    
-    #                 # Append to the formatted output
-    #                 formatted_output += f"[{start_timestamp}] {subtitle_text} "
-
-    #     return formatted_output
 
 
     def downloadAndTag(self, episodeMetadata: dict, path: str, srtPath: str, coverPath: str) -> None:
@@ -131,8 +106,9 @@ class KuKu:
             str(self.metadata["type"]), 'UTF-8')
         tag['----:com.apple.iTunes:Season'] = bytes(
             str(episodeMetadata["seasonNo"]), 'UTF-8')
-        tag['----:com.apple.iTunes:Age rating'] = bytes(
-            str(self.metadata["ageRating"]), 'UTF-8')
+        if self.metadata["ageRating"]:
+            tag['----:com.apple.iTunes:Age rating'] = bytes(
+                str(self.metadata["ageRating"]), 'UTF-8')
 
         for cat in self.metadata['credits'].keys():
             credit = cat.replace('_', ' ').capitalize()
@@ -185,8 +161,8 @@ class KuKu:
                 'seasonNo': ep['season_no'],
                 'date': str(ep.get('published_on')).strip(),
             }
-            print(ep['content']['hls_url'])
-            print(epMeta['hls'])
+            # print(ep['content']['hls_url'])
+            # print(epMeta['hls'])
                         
             trackPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
