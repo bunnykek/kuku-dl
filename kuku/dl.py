@@ -21,6 +21,7 @@ import multiprocessing
 import os
 import re
 import shutil
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial, wraps
 from traceback import format_exc
@@ -33,9 +34,11 @@ from mutagen.mp4 import MP4, MP4Cover
 from yt_dlp import YoutubeDL
 
 from .errors import UnableToArchive, EpisodeNotFound
+from .logger import LOGS
 
 # TODO: Option to Combine The Audios Into One Audio File
 
+warnings.filterwarnings("ignore") # for better cli ux
 
 class KuKu:
     def __init__(
@@ -46,6 +49,7 @@ class KuKu:
         batch_size: int = 5,
         archive: bool = False,
     ):
+        LOGS.info("Initializing Your Request...")
         self.batch_size = batch_size
         self._path = path
         self.rip_subs = rip_subtitles
@@ -77,9 +81,11 @@ class KuKu:
             "prefer_ffmpeg": True,
             "geo_bypass": True,
             "logtostderr": False,
-            "quiet": True,
+            "no_warnings": True,
+            "logger": LOGS
         }
         self._create_dirs()
+        LOGS.info("Successfully Initialized Your Request!!!")
 
     @staticmethod
     def _run_async(function):
@@ -97,7 +103,7 @@ class KuKu:
         try:
             return YoutubeDL(opts).download([url])
         except BaseException:
-            print(format_exc())
+            LOGS.error(str(format_exc()))
 
     @property
     def album_info(self) -> dict:
@@ -130,10 +136,12 @@ class KuKu:
         )
 
     def _create_zip(self):
+        LOGS.info("Archiving The Album...")
         shutil.make_archive(self.albumPath, "zip", self.albumPath)
         zip_path = self.albumPath + ".zip"
         if os.path.exists(zip_path):
             shutil.rmtree(self.albumPath)
+            LOGS.info("Successfully Archived The Album!")
             return zip_path
         raise UnableToArchive("Unable To Archive The Album!")
 
@@ -157,6 +165,9 @@ class KuKu:
             return
         opts = dict(self.opts)
         opts["outtmpl"] = path
+
+        LOGS.info(f"Downloading '{episodeMetadata['title']}' ...")
+
         await self.hls_download(url=episodeMetadata["hls"], opts=opts)
 
         hasLyrics: bool = len(episodeMetadata["srt"])
@@ -204,6 +215,7 @@ class KuKu:
             pic = MP4Cover(await f.read())
             tag["covr"] = [pic]
         tag.save()
+        LOGS.info(f"Successfully Downloaded '{episodeMetadata['title']}' !")
 
     async def downloadAlbum(self) -> str:
         episodes = []
@@ -222,12 +234,15 @@ class KuKu:
         for ep in episodes:
             epMeta = {
                 "title": self._sanitiseName(ep["title"].strip()),
-                "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8",
+                "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8" if ep["content"].get("hls_url") else None,
                 "srt": ep["content"].get("subtitle_url", "").strip(),
                 "epNo": ep["index"],
                 "seasonNo": ep["season_no"],
                 "date": str(ep.get("published_on")).strip(),
             }
+            if not epMeta["hls"]:
+                LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
+                continue
             trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
             srtPath = (
                 os.path.join(self.albumPath, f"{epMeta['title']}.srt")
@@ -253,12 +268,15 @@ class KuKu:
             for ep in data["episodes"]:
                 epMeta = {
                     "title": self._sanitiseName(ep["title"].strip()),
-                    "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8",
+                    "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8" if ep["content"].get("hls_url") else None,
                     "srt": ep["content"].get("subtitle_url", "").strip(),
                     "epNo": int(ep["index"]),
                     "seasonNo": int(ep["season_no"]),
                     "date": str(ep.get("published_on")).strip(),
                 }
+                if not epMeta["hls"]:
+                    LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
+                    continue
                 if epMeta["epNo"] == episode and epMeta["seasonNo"] == season:
                     trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
                     srtPath = (
@@ -279,5 +297,5 @@ class KuKu:
     async def _divide_and_run(self, tasks: list) -> None:
         tasks = self._divide_list(tasks, self.batch_size)
         for task_batch in tasks:
-            asyncio.gather(*task_batch)
-            await asyncio.sleep(5)
+            await asyncio.gather(*task_batch)
+            await asyncio.sleep(2)
