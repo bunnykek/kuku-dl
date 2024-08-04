@@ -32,7 +32,7 @@ import requests
 from mutagen.mp4 import MP4, MP4Cover
 from yt_dlp import YoutubeDL
 
-from .errors import UnableToArchive
+from .errors import UnableToArchive, EpisodeNotFound
 
 # TODO: Option to Combine The Audios Into One Audio File
 
@@ -57,7 +57,7 @@ class KuKu:
         ).json()
         show = data["show"]
         self.metadata = {
-            "title": self.sanitiseName(show["title"].strip()),
+            "title": self._sanitiseName(show["title"].strip()),
             "image": show["original_image"],
             "date": show["published_on"],
             "fictional": show["is_fictional"],
@@ -67,7 +67,7 @@ class KuKu:
             "type": " ".join(
                 show["content_type"]["slug"].strip().split("-")
             ).capitalize(),
-            "ageRating": show["meta_data"]["age_rating"].strip(),
+            "ageRating": show["meta_data"].get("age_rating"),
             "credits": {},
         }
         self.opts = {
@@ -77,11 +77,12 @@ class KuKu:
             "prefer_ffmpeg": True,
             "geo_bypass": True,
             "logtostderr": False,
+            "quiet": True,
         }
-        self.create_dirs()
+        self._create_dirs()
 
     @staticmethod
-    def run_async(function):
+    def _run_async(function):
         @wraps(function)
         async def wrapper(*args, **kwargs):
             return await asyncio.get_event_loop().run_in_executor(
@@ -91,7 +92,7 @@ class KuKu:
 
         return wrapper
 
-    @run_async
+    @_run_async
     def hls_download(self, url, opts):
         try:
             return YoutubeDL(opts).download([url])
@@ -109,26 +110,26 @@ class KuKu:
             "episodes": self.metadata["nEpisodes"],
         }
 
-    def divide_list(self, lst, n):
+    def _divide_list(self, lst, n):
         k, m = divmod(len(lst), n)
         return [lst[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n)]
 
-    async def get_response(self, url) -> dict:
+    async def _get_response(self, url) -> dict:
         res = await self.session.get(url)
         return await res.json()
 
-    async def get_srt(self, url) -> str:
+    async def _get_srt(self, url) -> str:
         res = await self.session.get(url)
         return await res.text()
 
-    def sanitiseName(self, name) -> str:
+    def _sanitiseName(self, name) -> str:
         return re.sub(
             r"[:]",
             " - ",
             re.sub(r'[\\/*?"<>|$]', "", re.sub(r"[ \t]+$", "", str(name).rstrip())),
         )
 
-    def create_zip(self):
+    def _create_zip(self):
         shutil.make_archive(self.albumPath, "zip", self.albumPath)
         zip_path = self.albumPath + ".zip"
         if os.path.exists(zip_path):
@@ -136,14 +137,14 @@ class KuKu:
             return zip_path
         raise UnableToArchive("Unable To Archive The Album!")
 
-    def create_dirs(self) -> None:
+    def _create_dirs(self) -> None:
         folderName = f"{self.metadata['title']} "
         folderName += (
             f"({self.metadata['date'][:4]}) " if self.metadata.get("date") else ""
         )
         folderName += f"[{self.metadata['lang']}]"
         self.albumPath = os.path.join(
-            os.getcwd(), self._path, self.sanitiseName(folderName)
+            os.getcwd(), self._path, self._sanitiseName(folderName)
         )
         if not os.path.exists(self.albumPath):
             os.makedirs(self.albumPath)
@@ -151,7 +152,7 @@ class KuKu:
         with open(self.cover, "wb") as f:
             f.write(requests.get(self.metadata["image"]).content)
 
-    async def download(self, episodeMetadata: dict, path: str, srtPath: str) -> None:
+    async def _download(self, episodeMetadata: dict, path: str, srtPath: str) -> None:
         if os.path.exists(path):
             return
         opts = dict(self.opts)
@@ -160,7 +161,7 @@ class KuKu:
 
         hasLyrics: bool = len(episodeMetadata["srt"])
         if hasLyrics and srtPath:
-            srt_response = await self.get_srt(episodeMetadata["srt"])
+            srt_response = await self._get_srt(episodeMetadata["srt"])
             async with aiofiles.open(srtPath, "w", encoding="utf-8") as f:
                 await f.write(srt_response)
 
@@ -190,9 +191,9 @@ class KuKu:
         tag["----:com.apple.iTunes:Season"] = bytes(
             str(episodeMetadata["seasonNo"]), "UTF-8"
         )
-        tag["----:com.apple.iTunes:Age rating"] = bytes(
-            str(self.metadata["ageRating"]), "UTF-8"
-        )
+        if self.metadata["ageRating"]:
+            tag['----:com.apple.iTunes:Age rating'] = bytes(
+                str(self.metadata["ageRating"]), 'UTF-8')
 
         for cat in self.metadata["credits"].keys():
             credit = cat.replace("_", " ").capitalize()
@@ -210,7 +211,7 @@ class KuKu:
         tasks = []
 
         while True:
-            data = await self.get_response(
+            data = await self._get_response(
                 f"https://kukufm.com/api/v2.0/channels/{self.showID}/episodes/?page={page}"
             )
             episodes.extend(data["episodes"])
@@ -220,7 +221,7 @@ class KuKu:
 
         for ep in episodes:
             epMeta = {
-                "title": self.sanitiseName(ep["title"].strip()),
+                "title": self._sanitiseName(ep["title"].strip()),
                 "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8",
                 "srt": ep["content"].get("subtitle_url", "").strip(),
                 "epNo": ep["index"],
@@ -233,16 +234,50 @@ class KuKu:
                 if self.rip_subs
                 else None
             )
-            tasks.append(self.download(epMeta, trackPath, srtPath))
+            tasks.append(self._download(epMeta, trackPath, srtPath))
 
-        await self.divide_and_run(tasks)
+        await self._divide_and_run(tasks)
         await self.session.close()
         if self.archive:
-            return self.create_zip()
+            return self._create_zip()
         return self.albumPath
 
-    async def divide_and_run(self, tasks: list) -> None:
-        tasks = self.divide_list(tasks, self.batch_size)
+    # i tried episode endpoint but it didn't give hls url, so have to use the following approach
+    async def downloadEpisode(self, episode: int, season: int = 1) -> str:
+        page = 1
+
+        while True:
+            data = await self._get_response(
+                f"https://kukufm.com/api/v2.0/channels/{self.showID}/episodes/?page={page}"
+            )
+            for ep in data["episodes"]:
+                epMeta = {
+                    "title": self._sanitiseName(ep["title"].strip()),
+                    "hls": ep["content"]["hls_url"].strip()[:-5] + "128kb.m3u8",
+                    "srt": ep["content"].get("subtitle_url", "").strip(),
+                    "epNo": int(ep["index"]),
+                    "seasonNo": int(ep["season_no"]),
+                    "date": str(ep.get("published_on")).strip(),
+                }
+                if epMeta["epNo"] == episode and epMeta["seasonNo"] == season:
+                    trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
+                    srtPath = (
+                        os.path.join(self.albumPath, f"{epMeta['title']}.srt")
+                        if self.rip_subs
+                        else None
+                    )
+                    await self._download(epMeta, trackPath, srtPath)
+                    await self.session.close()
+                    if self.archive:
+                        return self._create_zip()
+                    return self.albumPath
+            page += 1
+            if not data["has_more"]:
+                break
+        raise EpisodeNotFound("Unable To Find The Following Episode")
+
+    async def _divide_and_run(self, tasks: list) -> None:
+        tasks = self._divide_list(tasks, self.batch_size)
         for task_batch in tasks:
             asyncio.gather(*task_batch)
             await asyncio.sleep(5)
