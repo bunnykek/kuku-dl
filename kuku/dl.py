@@ -241,7 +241,7 @@ class KuKu:
                 "date": str(ep.get("published_on")).strip(),
             }
             if not epMeta["hls"]:
-                LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
+                LOGS.warning(f"Unable To Rip '{epMeta['title']}' , Skipping!")
                 continue
             trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
             srtPath = (
@@ -274,10 +274,10 @@ class KuKu:
                     "seasonNo": int(ep["season_no"]),
                     "date": str(ep.get("published_on")).strip(),
                 }
-                if not epMeta["hls"]:
-                    LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
-                    continue
                 if epMeta["epNo"] == episode and epMeta["seasonNo"] == season:
+                    if not epMeta["hls"]:
+                        LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
+                        continue
                     trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
                     srtPath = (
                         os.path.join(self.albumPath, f"{epMeta['title']}.srt")
