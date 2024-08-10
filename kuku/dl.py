@@ -277,7 +277,7 @@ class KuKu:
                 if epMeta["epNo"] == episode and epMeta["seasonNo"] == season:
                     if not epMeta["hls"]:
                         LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
-                        continue
+                        return
                     trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
                     srtPath = (
                         os.path.join(self.albumPath, f"{epMeta['title']}.srt")
