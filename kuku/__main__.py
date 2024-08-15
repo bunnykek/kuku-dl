@@ -37,7 +37,7 @@ if __name__ == "__main__":
     print(BANNER)
     parser = argparse.ArgumentParser(prog="kuku-dl", description="KuKu FM Downloader!")
 
-    parser.add_argument("url", type=str, help="The URL of the video to download")
+    parser.add_argument("url", type=str, help="The URL of the podcast or album to download")
     parser.add_argument(
     "--path",
     type=str,
