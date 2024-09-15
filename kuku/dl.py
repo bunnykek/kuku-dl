@@ -31,14 +31,12 @@ import aiofiles
 import aiohttp
 import requests
 from mutagen.mp4 import MP4, MP4Cover
-from yt_dlp import YoutubeDL
+from yt_dlp import YoutubeDL, utils
 
-from .errors import UnableToArchive, EpisodeNotFound
+from .errors import UnableToArchive, EpisodeNotFound, UnableToDownload
 from .logger import LOGS
 
 # TODO: Option to Combine The Audios Into One Audio File
-
-warnings.filterwarnings("ignore") # for better cli ux
 
 class KuKu:
     def __init__(
@@ -102,6 +100,11 @@ class KuKu:
     def hls_download(self, url, opts):
         try:
             return YoutubeDL(opts).download([url])
+        except utils.DownloadError:
+            if "128kb.m3u8" in url.strip():
+                url = url.strip()[:-10] + ".m3u8"
+                return YoutubeDL(opts).download([url])
+            raise UnableToDownload(f"Unable To Download {url}")
         except BaseException:
             LOGS.error(str(format_exc()))
 
@@ -168,7 +171,11 @@ class KuKu:
 
         LOGS.info(f"Downloading '{episodeMetadata['title']}' ...")
 
-        await self.hls_download(url=episodeMetadata["hls"], opts=opts)
+        try:
+            await self.hls_download(url=episodeMetadata["hls"], opts=opts)
+        except UnableToDownload as UDE:
+            LOGS.warning(UDE)
+            return 
 
         hasLyrics: bool = len(episodeMetadata["srt"])
         if hasLyrics and srtPath:
@@ -276,7 +283,7 @@ class KuKu:
                 }
                 if epMeta["epNo"] == episode and epMeta["seasonNo"] == season:
                     if not epMeta["hls"]:
-                        LOGS.critical(f"Unable To Rip '{epMeta['title']}' , Skipping!")
+                        LOGS.critical(f"Unable To Rip '{epMeta['title']}' !")
                         return
                     trackPath = os.path.join(self.albumPath, f"{epMeta['title']}.m4a")
                     srtPath = (

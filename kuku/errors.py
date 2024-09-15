@@ -3,3 +3,6 @@ class UnableToArchive(Exception):
 
 class EpisodeNotFound(Exception):
     pass
+
+class UnableToDownload(Exception):
+    pass
