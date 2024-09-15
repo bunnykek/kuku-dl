@@ -78,7 +78,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     KUKU = KuKu(args.url, args.path, args.rip_subtitles, args.batch_size, args.archive)
 
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop =  asyncio.get_event_loop_policy().get_event_loop()
 
     if args.episode:
         loop.run_until_complete(KUKU.downloadEpisode(args.episode, args.season))
