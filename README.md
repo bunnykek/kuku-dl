@@ -6,8 +6,14 @@ Kuku FM downloader!
 - Tags the tracks/eps with all the necessary metadata and cover artwork.
 - Subtitles
 
-### Setup
-- Install FFMPEG
+### You can use docker container or install the package locally : 
+
+#### Docker container
+- build docker image : ``docker build . -t kuku-dl``
+- run docker image : ``docker run -v ./Downloads:/kuku-dl/Downloads kuku-dl [KUKUFM_URL]``
+
+#### Install locally
+- Install [FFMPEG](https://ffmpeg.org/)
 - `pip install requirements.txt`
 
 ### Usage     
