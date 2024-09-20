@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+env
+.dockerignore
+Dockerfile
+venv
+.DS_Store
+.git
+.gitignore
+Downloads
