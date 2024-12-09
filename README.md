@@ -6,14 +6,78 @@ Kuku FM downloader!
 - Tags the tracks/eps with all the necessary metadata and cover artwork.
 - Subtitles
 
-### Setup
-- Install FFMPEG
-- `pip install requirements.txt`
+### Installation Instructions
+
+#### Windows
+1. Install Python (3.7 or higher)
+   ```bash
+   # Download Python from https://www.python.org/downloads/
+   # During installation, make sure to check "Add Python to PATH"
+   ```
+
+2. Install FFmpeg
+   ```bash
+   # Method 1: Using winget (Windows Package Manager)
+   winget install FFmpeg
+
+   # Method 2: Manual Installation
+   # 1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/
+   # 2. Extract the zip file
+   # 3. Add the bin folder to System PATH
+   ```
+
+3. Install Python dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+#### MacOS
+1. Install Homebrew (if not already installed)
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+
+2. Install Python and FFmpeg
+   ```bash
+   brew install python3
+   brew install ffmpeg
+   ```
+
+3. Install Python dependencies
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+
+#### Linux (Ubuntu/Debian)
+1. Update package list and install Python, pip, and FFmpeg
+   ```bash
+   sudo apt update
+   sudo apt install python3 python3-pip ffmpeg
+   ```
+
+2. Install Python dependencies
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+
+#### Linux (Fedora)
+1. Install Python, pip, and FFmpeg
+   ```bash
+   sudo dnf install python3 python3-pip ffmpeg
+   ```
+
+2. Install Python dependencies
+   ```bash
+   pip3 install -r requirements.txt
+   ```
 
 ### Usage     
-      
-```
-py kuku.py [url]
+```bash
+# Windows
+python kuku.py [url]
+
+# MacOS/Linux
+python3 kuku.py [url]
 ```
 
 ### Sample MediaInfo
@@ -63,5 +127,6 @@ Stream size                              : 1.70 MiB (72%)
 Default                                  : Yes
 Alternate group                          : 1
 ```
+
 ### Disclaimer
-- I will not be responsible for how you use kuku-dl.    
+- I will not be responsible for how you use kuku-dl.

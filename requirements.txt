@@ -1,2 +1,11 @@
-requests
-mutagen
+# Core dependencies
+requests>=2.31.0
+mutagen>=1.47.0
+
+# Additional system requirements:
+# Windows: ffmpeg.exe must be in PATH or current directory
+# MacOS: Install ffmpeg via 'brew install ffmpeg'
+# Linux: Install ffmpeg via package manager (e.g., 'apt install ffmpeg' for Ubuntu)
+
+# Optional: For better terminal output
+tqdm>=4.66.1  # Progress bar support (optional)
