@@ -37,14 +37,8 @@ class KuKu:
             'credits': {},
         }
 
-        album_info = F"""Album info:
-                Name: {self.metadata['title']}
-                Author: {self.metadata['author']}
-                Language: {self.metadata['lang']}
-                Date: {self.metadata['date']}
-                Age rating: {self.metadata['ageRating']}
-                Episodes: {self.metadata['nEpisodes']}
-        """
+        album_info = F"""Album: {self.metadata['title']} ({self.metadata['nEpisodes']} episodes)
+Author: {self.metadata['author']} | Language: {self.metadata['lang']}"""
         print(album_info)
         
         for credit in show['credits'].keys():
@@ -67,13 +61,35 @@ class KuKu:
         @param srtPath: str which sets the subtitle file path.
         @param coverPath: str path which locates where cover art is, so it'll be embeded within the file.
         """
-        print('Downloading', episodeMetadata['title'], flush=True)
+        print(f"\rDownloading: {episodeMetadata['title']}", end='', flush=True)
         if os.path.exists(path):
-            print(episodeMetadata['title'], 'already exists!', flush=True)
+            print(f"\rSkipped: {episodeMetadata['title']} (already exists)", flush=True)
             return
-        # TODO Redo the use of FFMPEG as it's useless. and is worse
-        subprocess.run(['ffmpeg', '-i', episodeMetadata['hls'],
-                        '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path])
+
+        # Create parent directory if it doesn't exist
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        # Download using ffmpeg
+        audio_url = episodeMetadata['hls']
+        
+        # Don't modify the URL if it already contains m3u8
+        if not audio_url.endswith('m3u8'):
+            if audio_url.endswith('/'):
+                audio_url = audio_url.rstrip('/') + "/128kb.m3u8"
+            else:
+                audio_url = audio_url + "/128kb.m3u8"
+            
+        result = subprocess.run(['ffmpeg', '-i', audio_url,
+                      '-c', 'copy', '-y', '-hide_banner', '-loglevel', 'error', path],
+                      capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"\rError: Failed to download {episodeMetadata['title']}")
+            if result.stderr:
+                print(f"Error details: {result.stderr}")
+            return
+        
+        print(f"\rCompleted: {episodeMetadata['title']}", flush=True)
         
         hasLyrics: bool = len(episodeMetadata['srt'])
         
@@ -84,8 +100,6 @@ class KuKu:
         
         tag = MP4(path)
         
-        # if hasLyrics:
-        #     tag['\xa9lyr'] = [KuKu.srt_to_custom_format(srt_response.text)]
         tag['\xa9alb'] = [self.metadata['title']]
         tag['\xa9ART'] = [self.metadata['author']]
         tag['aART'] = [self.metadata['author']]
@@ -130,13 +144,15 @@ class KuKu:
             'date') else ''
         folderName += f"[{self.metadata['lang']}]"
 
+        # Use current directory instead of getcwd()
         albumPath = os.path.join(
-            os.getcwd(), 'Downloads', self.metadata['lang'], self.metadata['type'], self.sanitiseName(folderName))
+            'Downloads', self.metadata['lang'], self.metadata['type'], self.sanitiseName(folderName))
 
-        if not os.path.exists(albumPath):
-            os.makedirs(albumPath)
+        # Create all directories in the path
+        os.makedirs(albumPath, exist_ok=True)
 
-        with open(os.path.join(albumPath, 'cover.png'), 'wb') as f:
+        coverPath = os.path.join(albumPath, 'cover.png')
+        with open(coverPath, 'wb') as f:
             f.write(self.session.get(self.metadata['image']).content)
 
         episodes = []
@@ -153,23 +169,28 @@ class KuKu:
                 break
 
         for ep in episodes:
+            # Get the audio URL, preferring premium_audio_url over hls_url
+            audio_url = ep['content'].get('premium_audio_url', '') or ep['content'].get('hls_url', '')
+            audio_url = audio_url.strip()
+            
+            if not audio_url:
+                print(f"\rError: No audio URL found for episode {ep['title']}")
+                continue
+                
             epMeta = {
                 'title': KuKu.sanitiseName(ep["title"].strip()),
-                'hls': ep['content']['hls_url'].strip()[:-5]+"128kb.m3u8",
+                'hls': audio_url,
                 'srt': ep['content'].get('subtitle_url', "").strip(),
                 'epNo': ep['index'],
                 'seasonNo': ep['season_no'],
                 'date': str(ep.get('published_on')).strip(),
             }
-            # print(ep['content']['hls_url'])
-            # print(epMeta['hls'])
                         
             trackPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.m4a")
             srtPath = os.path.join(
                 albumPath, f"{str(ep['index']).zfill(2)}. {epMeta['title']}.srt")
-            self.downloadAndTag(epMeta, trackPath, srtPath,
-                                os.path.join(albumPath, 'cover.png'))
+            self.downloadAndTag(epMeta, trackPath, srtPath, coverPath)
 
 
 if __name__ == '__main__':
