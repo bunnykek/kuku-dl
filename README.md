@@ -9,7 +9,7 @@ Kuku FM downloader!
 ### Setup
 - `pip install requirements.txt`
 - Install [Get cookies.txt](https://chromewebstore.google.com/detail/cclelndahbckbenkjhflpdbgdldlbecc) extension
-- Login to kukufm.com and click on extension then select export format as `Netscape` then copy and paste the cookies to `cookies.txt` file in this project root.
+- Login to kukufm.com with premium account and click on extension then select export format as `Netscape` then copy and paste the cookies to `cookies.txt` file in this project root.
 
 ### Usage     
       
