@@ -2,13 +2,14 @@
 Kuku FM downloader!
 
 ### Features
-- Downloads podcasts/story/etc.
+- Downloads podcasts/story/videos/etc.
 - Tags the tracks/eps with all the necessary metadata and cover artwork.
 - Subtitles
 
 ### Setup
-- Install FFMPEG
 - `pip install requirements.txt`
+- Install [Get cookies.txt](https://chromewebstore.google.com/detail/cclelndahbckbenkjhflpdbgdldlbecc) extension
+- Login to kukufm.com and click on extension then select export format as `Netscape` then copy and paste the cookies to `cookies.txt` file in this project root.
 
 ### Usage     
       

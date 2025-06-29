@@ -3,3 +3,4 @@ venv
 .vscode
 .DS_Store
 Downloads/
+.venv
